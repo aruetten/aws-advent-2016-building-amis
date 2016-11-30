@@ -1,0 +1,62 @@
+{
+    "description": "Demo Packer template",
+    "variables": {
+        "aws_access_key": "",
+        "aws_secret_key": "",
+        "base_ami": "ami-b520c0d8",
+        "base_docker_image": "ubuntu:16.04",
+        "instance_type": "t2.medium",
+        "vpc_id": "vpc-12345678",
+        "subnet_id": "subnet-87654321"
+    },
+    "builders": [
+        {
+            "type": "amazon-ebs",
+            "access_key": "{{user `aws_access_key`}}",
+            "secret_key": "{{user `aws_secret_key`}}",
+            "region": "us-east-1",
+            "source_ami": "{{user `base_ami`}}",
+            "instance_type": "{{user `instance_type`}}",
+            "vpc_id": "{{user `vpc_id`}}",
+            "subnet_id": "{{user `subnet_id`}}",
+            "associate_public_ip_address": true,
+            "ssh_username": "ubuntu",
+            "ami_name": "Packer-build DEMO {{timestamp}}",
+            "ami_description": "Build at {{isotime \"Mon, 02 Jan 2006 15:04:05 MST\"}} based on {{user `base_ami`}}"
+        },
+        {
+            "type": "docker",
+            "image": "{{user `base_docker_image`}}",
+            "pull": true,
+            "commit": true,
+            "run_command": ["-d", "-i", "--net=host", "-t", "{{.Image}}", "/bin/bash"]
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "script": "bootstrap.sh",
+            "only": ["docker"]
+        },
+        {
+            "type": "shell",
+            "script": "bootstrap.sh",
+            "execute_command": "{{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "only": ["amazon-ebs"]
+        },
+        {
+            "type": "shell",
+            "script": "cleanup.sh"
+        }
+    ],
+    "post-processors": [
+        [
+            {
+                "type": "docker-tag",
+                "only": ["docker"],
+                "repository": "demo/awsadvent",
+                "tag": "{{timestamp}}"
+            }
+        ]
+    ]
+}
